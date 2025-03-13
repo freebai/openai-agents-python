@@ -1,94 +1,57 @@
 # Configuring the SDK
 
 ## API keys and clients
+# 配置API密钥和客户端
+# 默认情况下SDK会从环境变量OPENAI_API_KEY获取API密钥
 
-By default, the SDK looks for the `OPENAI_API_KEY` environment variable for LLM requests and tracing, as soon as it is imported. If you are unable to set that environment variable before your app starts, you can use the [set_default_openai_key()][agents.set_default_openai_key] function to set the key.
-
-```python
+# 方法1：直接设置默认API密钥
 from agents import set_default_openai_key
+set_default_openai_key("sk-...")  # 替换为你的实际API密钥
 
-set_default_openai_key("sk-...")
-```
-
-Alternatively, you can also configure an OpenAI client to be used. By default, the SDK creates an `AsyncOpenAI` instance, using the API key from the environment variable or the default key set above. You can change this by using the [set_default_openai_client()][agents.set_default_openai_client] function.
-
-```python
+# 方法2：自定义OpenAI客户端
 from openai import AsyncOpenAI
 from agents import set_default_openai_client
+custom_client = AsyncOpenAI(
+    base_url="...",  # 自定义API端点
+    api_key="..."    # 自定义API密钥
+)
+set_default_openai_client(custom_client)  # 设置自定义客户端
 
-custom_client = AsyncOpenAI(base_url="...", api_key="...")
-set_default_openai_client(custom_client)
-```
-
-Finally, you can also customize the OpenAI API that is used. By default, we use the OpenAI Responses API. You can override this to use the Chat Completions API by using the [set_default_openai_api()][agents.set_default_openai_api] function.
-
-```python
+# 方法3：选择使用的OpenAI API类型
 from agents import set_default_openai_api
-
-set_default_openai_api("chat_completions")
-```
+set_default_openai_api("chat_completions")  # 使用聊天补全API
 
 ## Tracing
+# 追踪功能配置
+# 默认启用，使用与LLM相同的API密钥
 
-Tracing is enabled by default. It uses the OpenAI API keys from the section above by default (i.e. the environment variable or the default key you set). You can specifically set the API key used for tracing by using the [`set_tracing_export_api_key`][agents.set_tracing_export_api_key] function.
-
-```python
+# 设置专门的追踪API密钥
 from agents import set_tracing_export_api_key
+set_tracing_export_api_key("sk-...")  # 设置追踪专用密钥
 
-set_tracing_export_api_key("sk-...")
-```
-
-You can also disable tracing entirely by using the [`set_tracing_disabled()`][agents.set_tracing_disabled] function.
-
-```python
+# 禁用追踪功能
 from agents import set_tracing_disabled
-
-set_tracing_disabled(True)
-```
+set_tracing_disabled(True)  # 传入True禁用追踪
 
 ## Debug logging
+# 调试日志配置
+# 默认只输出警告和错误
 
-The SDK has two Python loggers without any handlers set. By default, this means that warnings and errors are sent to `stdout`, but other logs are suppressed.
-
-To enable verbose logging, use the [`enable_verbose_stdout_logging()`][agents.enable_verbose_stdout_logging] function.
-
-```python
+# 启用详细日志输出
 from agents import enable_verbose_stdout_logging
+enable_verbose_stdout_logging()  # 启用详细日志
 
-enable_verbose_stdout_logging()
-```
-
-Alternatively, you can customize the logs by adding handlers, filters, formatters, etc. You can read more in the [Python logging guide](https://docs.python.org/3/howto/logging.html).
-
-```python
+# 自定义日志配置
 import logging
-
-logger =  logging.getLogger("openai.agents") # or openai.agents.tracing for the Tracing logger
-
-# To make all logs show up
-logger.setLevel(logging.DEBUG)
-# To make info and above show up
-logger.setLevel(logging.INFO)
-# To make warning and above show up
-logger.setLevel(logging.WARNING)
-# etc
-
-# You can customize this as needed, but this will output to `stderr` by default
-logger.addHandler(logging.StreamHandler())
-```
+logger = logging.getLogger("openai.agents")  # 获取SDK日志器
+logger.setLevel(logging.DEBUG)  # 设置日志级别
+logger.addHandler(logging.StreamHandler())  # 添加控制台处理器
 
 ### Sensitive data in logs
+# 敏感数据日志控制
 
-Certain logs may contain sensitive data (for example, user data). If you want to disable this data from being logged, set the following environment variables.
-
-To disable logging LLM inputs and outputs:
-
-```bash
+# 禁用模型数据日志
 export OPENAI_AGENTS_DONT_LOG_MODEL_DATA=1
-```
 
-To disable logging tool inputs and outputs:
-
-```bash
+# 禁用工具数据日志
 export OPENAI_AGENTS_DONT_LOG_TOOL_DATA=1
-```
