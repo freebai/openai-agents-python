@@ -54,7 +54,7 @@ from openai.types.responses import (
     ResponseUsage,
 )
 from openai.types.responses.response_input_param import FunctionCallOutput, ItemReference, Message
-from openai.types.responses.response_usage import OutputTokensDetails
+from openai.types.responses.response_usage import InputTokensDetails, OutputTokensDetails
 
 from .. import _debug
 from ..agent_output import AgentOutputSchema
@@ -420,6 +420,11 @@ class OpenAIChatCompletionsModel(Model):
                         and usage.completion_tokens_details.reasoning_tokens
                         else 0
                     ),
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=usage.prompt_tokens_details.cached_tokens
+                        if usage.prompt_tokens_details and usage.prompt_tokens_details.cached_tokens
+                        else 0
+                    ),
                 )
                 if usage
                 else None
@@ -513,6 +518,11 @@ class OpenAIChatCompletionsModel(Model):
                 f"Response format: {response_format}\n"
             )
 
+        # Match the behavior of Responses where store is True when not given
+        store = model_settings.store if model_settings.store is not None else True
+
+        reasoning_effort = model_settings.reasoning.effort if model_settings.reasoning else None
+
         ret = await self._get_client().chat.completions.create(
             model=self.model,
             messages=converted_messages,
@@ -527,7 +537,10 @@ class OpenAIChatCompletionsModel(Model):
             parallel_tool_calls=parallel_tool_calls,
             stream=stream,
             stream_options={"include_usage": True} if stream else NOT_GIVEN,
+            store=store,
+            reasoning_effort=self._non_null_or_not_given(reasoning_effort),
             extra_headers=_HEADERS,
+            metadata=model_settings.metadata,
         )
 
         if isinstance(ret, ChatCompletion):
@@ -546,6 +559,7 @@ class OpenAIChatCompletionsModel(Model):
             temperature=model_settings.temperature,
             tools=[],
             parallel_tool_calls=parallel_tool_calls or False,
+            reasoning=model_settings.reasoning,
         )
         return response, ret
 
@@ -752,7 +766,7 @@ class _Converter:
             elif isinstance(c, dict) and c.get("type") == "input_file":
                 raise UserError(f"File uploads are not supported for chat completions {c}")
             else:
-                raise UserError(f"Unknonw content: {c}")
+                raise UserError(f"Unknown content: {c}")
         return out
 
     @classmethod
@@ -914,12 +928,13 @@ class _Converter:
             elif func_call := cls.maybe_function_tool_call(item):
                 asst = ensure_assistant_message()
                 tool_calls = list(asst.get("tool_calls", []))
+                arguments = func_call["arguments"] if func_call["arguments"] else "{}"
                 new_tool_call = ChatCompletionMessageToolCallParam(
                     id=func_call["call_id"],
                     type="function",
                     function={
                         "name": func_call["name"],
-                        "arguments": func_call["arguments"],
+                        "arguments": arguments,
                     },
                 )
                 tool_calls.append(new_tool_call)
@@ -962,7 +977,7 @@ class ToolConverter:
             }
 
         raise UserError(
-            f"Hosted tools are not supported with the ChatCompletions API. FGot tool type: "
+            f"Hosted tools are not supported with the ChatCompletions API. Got tool type: "
             f"{type(tool)}, tool: {tool}"
         )
 
